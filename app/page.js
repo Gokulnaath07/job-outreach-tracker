@@ -1,5 +1,6 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import Papa from 'papaparse';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -28,6 +29,76 @@ export default function OutreachTracker() {
   const [action, setAction] = useState('email_sent');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const handleImport = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setUploading(true);
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        try {
+          const maxRank = contacts.reduce((max, c) => Math.max(max, c.rank || 0), 0);
+          
+          const newContacts = results.data
+            .filter(row => row.prospect_full_name || (row.profile_first_name && row.profile_last_name))
+            .map((row, index) => {
+              let linkedinUrl = row.prospect_linkedin;
+              if (!linkedinUrl && row.profile_linkedin_url_array) {
+                try {
+                  const arr = JSON.parse(row.profile_linkedin_url_array.replace(/""/g, '"'));
+                  if (arr && arr.length > 0) linkedinUrl = arr[0];
+                } catch (e) {}
+              }
+
+              return {
+                name: row.prospect_full_name || `${row.profile_first_name || ''} ${row.profile_last_name || ''}`.trim(),
+                title: row.prospect_job_title,
+                linkedin: linkedinUrl,
+                company: row.prospect_company_name,
+                website: row.prospect_company_website,
+                email: row.contact_professions_email || null,
+                city: row.profile_city,
+                state: row.profile_region_name,
+                rank: maxRank + index + 1,
+                fit_for_resume: 'Medium',
+                actively_hiring: false,
+                has_network_intro: false,
+              };
+            });
+
+          if (newContacts.length > 0) {
+            const { error } = await supabase.from('contacts').insert(newContacts);
+            if (error) {
+              console.error("Error inserting contacts:", error);
+              alert("Error importing contacts: " + error.message);
+            } else {
+              alert(`Successfully imported ${newContacts.length} contacts!`);
+              load();
+            }
+          } else {
+             alert('No valid contacts found in the CSV.');
+          }
+        } catch (err) {
+          console.error("Error during import:", err);
+          alert("Error during import: " + err.message);
+        } finally {
+          setUploading(false);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+      },
+      error: (error) => {
+        console.error("PapaParse error:", error);
+        alert("Error parsing CSV");
+        setUploading(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    });
+  };
 
   useEffect(() => { load(); }, []);
 
@@ -152,6 +223,30 @@ export default function OutreachTracker() {
             {label}
           </button>
         ))}
+        
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
+          <input 
+            type="file" 
+            accept=".csv" 
+            style={{ display: 'none' }} 
+            ref={fileInputRef}
+            onChange={handleImport} 
+          />
+          <button 
+            onClick={() => fileInputRef.current?.click()} 
+            disabled={uploading}
+            style={{
+              fontFamily: 'monospace', fontSize: 11, padding: '8px 14px',
+              border: '1px solid #1a1814',
+              background: '#1a1814',
+              color: '#fff',
+              cursor: uploading ? 'wait' : 'pointer', 
+              textTransform: 'uppercase', 
+              letterSpacing: '0.08em'
+            }}>
+            {uploading ? 'Importing...' : 'Import CSV'}
+          </button>
+        </div>
       </div>
 
       {/* Cards grid */}
@@ -315,7 +410,7 @@ export default function OutreachTracker() {
                   <div style={{ fontSize: 10, color: '#8b8378', marginTop: 4 }}>
                     {history.length} action{history.length > 1 ? 's' : ''} logged
                     {history[0]?.notes && (
-                      <span style={{ color: '#5b554d' }}> · "{history[0].notes}"</span>
+                      <span style={{ color: '#5b554d' }}> · &quot;{history[0].notes}&quot;</span>
                     )}
                   </div>
                 )}
