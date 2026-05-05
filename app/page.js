@@ -10,6 +10,7 @@ const supabase = createClient(
 
 const STATUS_LABELS = {
   email_sent: { label: 'Email sent', color: '#185FA5' },
+  connection_sent: { label: 'Sent connection', color: '#0D9488' },
   linkedin_connected: { label: 'LI connected', color: '#0F6E56' },
   linkedin_messaged: { label: 'LI messaged', color: '#3B6D11' },
   replied: { label: 'Replied!', color: '#BA7517' },
