@@ -18,6 +18,7 @@ const STATUS_LABELS = {
   offer_received: { label: 'Offer 🏆', color: '#1D9E75' },
   rejected: { label: 'Rejected', color: '#A32D2D' },
   no_response: { label: 'No response', color: '#5F5E5A' },
+  not_found: { label: 'Not found', color: '#737373' },
 };
 
 export default function OutreachTracker() {
