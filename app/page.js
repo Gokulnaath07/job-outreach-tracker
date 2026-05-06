@@ -134,15 +134,21 @@ export default function OutreachTracker() {
 
   async function logAction(contactId) {
     setSaving(true);
-    await supabase.from('outreach_log').insert({
+    const { error } = await supabase.from('outreach_log').insert({
       contact_id: contactId,
       action,
       notes: note || null,
     });
-    setLogging(null);
-    setNote('');
+    
+    if (error) {
+      console.error("Error logging action:", error);
+      alert("Error logging action: " + error.message);
+    } else {
+      setLogging(null);
+      setNote('');
+      load();
+    }
     setSaving(false);
-    load();
   }
 
   const filtered = contacts.filter(c => {
