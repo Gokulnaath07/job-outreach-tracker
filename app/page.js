@@ -33,8 +33,14 @@ export default function OutreachTracker() {
   const [action, setAction] = useState('email_sent');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [viewingHistory, setViewingHistory] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newContact, setNewContact] = useState({ name: '', title: '', company: '', linkedin: '', email: '', city: '', state: '', fit_for_resume: 'Medium', actively_hiring: false, has_network_intro: false, network_intro_via: '', note: '' });
+  const [isSubmittingContact, setIsSubmittingContact] = useState(false);
   const fileInputRef = useRef(null);
+
+  const inputStyle = { fontFamily: 'monospace', fontSize: 12, padding: '8px 10px', border: '1px solid #e0d8c9', width: '100%', boxSizing: 'border-box' };
 
   const handleImport = (event) => {
     const file = event.target.files[0];
@@ -167,6 +173,28 @@ export default function OutreachTracker() {
     }
   }
 
+  async function handleAddContact(e) {
+    e.preventDefault();
+    setIsSubmittingContact(true);
+    const maxRank = contacts.reduce((max, c) => Math.max(max, c.rank || 0), 0);
+    const contactToInsert = { ...newContact, rank: maxRank + 1 };
+    
+    if (!contactToInsert.has_network_intro) {
+      delete contactToInsert.network_intro_via;
+    }
+    
+    const { error } = await supabase.from('contacts').insert([contactToInsert]);
+    if (error) {
+      console.error("Error adding contact:", error);
+      alert("Error adding contact: " + error.message);
+    } else {
+      setIsAddModalOpen(false);
+      setNewContact({ name: '', title: '', company: '', linkedin: '', email: '', city: '', state: '', fit_for_resume: 'Medium', actively_hiring: false, has_network_intro: false, network_intro_via: '', note: '' });
+      load(false);
+    }
+    setIsSubmittingContact(false);
+  }
+
   const filtered = contacts.filter(c => {
     const matchSearch = !search ||
       c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -284,6 +312,19 @@ export default function OutreachTracker() {
                 letterSpacing: '0.08em'
               }}>
               {uploading ? 'Importing...' : 'Import CSV'}
+            </button>
+            <button 
+              onClick={() => setIsAddModalOpen(true)} 
+              style={{
+                fontFamily: 'monospace', fontSize: 11, padding: '8px 14px',
+                border: '1px solid #1a1814',
+                background: '#fff',
+                color: '#1a1814',
+                cursor: 'pointer', 
+                textTransform: 'uppercase', 
+                letterSpacing: '0.08em'
+              }}>
+              + Add Contact
             </button>
           </div>
         </div>
@@ -459,15 +500,28 @@ export default function OutreachTracker() {
                       </span>
                     )}
                   </div>
-                  <button onClick={() => setLogging(isLogging ? null : c.id)} style={{
-                    fontSize: 10, padding: '4px 10px',
-                    border: '1px solid #1a1814',
-                    background: isLogging ? '#1a1814' : '#fff',
-                    color: isLogging ? '#fff' : '#1a1814',
-                    cursor: 'pointer', fontFamily: 'monospace'
-                  }}>
-                    {isLogging ? 'cancel' : '+ log'}
-                  </button>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {history.length > 0 && (
+                      <button onClick={() => setViewingHistory(viewingHistory === c.id ? null : c.id)} style={{
+                        fontSize: 10, padding: '4px 10px',
+                        border: '1px solid #1a1814',
+                        background: viewingHistory === c.id ? '#1a1814' : '#fff',
+                        color: viewingHistory === c.id ? '#fff' : '#1a1814',
+                        cursor: 'pointer', fontFamily: 'monospace'
+                      }}>
+                        {viewingHistory === c.id ? 'hide' : 'history'}
+                      </button>
+                    )}
+                    <button onClick={() => setLogging(isLogging ? null : c.id)} style={{
+                      fontSize: 10, padding: '4px 10px',
+                      border: '1px solid #1a1814',
+                      background: isLogging ? '#1a1814' : '#fff',
+                      color: isLogging ? '#fff' : '#1a1814',
+                      cursor: 'pointer', fontFamily: 'monospace'
+                    }}>
+                      {isLogging ? 'cancel' : '+ log'}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Log form */}
@@ -503,13 +557,37 @@ export default function OutreachTracker() {
                 )}
 
                 {/* History line */}
-                {history.length > 0 && !isLogging && (
-                  <div style={{ fontSize: 10, color: '#8b8378', marginTop: 4 }}>
-                    {history.length} action{history.length > 1 ? 's' : ''} logged
-                    {history[0]?.notes && (
-                      <span style={{ color: '#5b554d' }}> · &quot;{history[0].notes}&quot;</span>
-                    )}
+                {/* History view */}
+                {viewingHistory === c.id ? (
+                  <div style={{ background: '#fff', border: '1px solid #e0d8c9', padding: 10, marginTop: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 8, borderBottom: '1px solid #eee', paddingBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Interaction History</div>
+                    {history.map((logEntry, idx) => (
+                      <div key={logEntry.id || idx} style={{ marginBottom: 8, paddingBottom: 8, borderBottom: idx === history.length - 1 ? 'none' : '1px dashed #eee' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: STATUS_LABELS[logEntry.action]?.color || '#1a1814' }}>
+                            {STATUS_LABELS[logEntry.action]?.label || logEntry.action}
+                          </span>
+                          <span style={{ fontSize: 9, color: '#8b8378' }}>
+                            {new Date(logEntry.logged_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                        {logEntry.notes && (
+                          <div style={{ fontSize: 10, color: '#5b554d', fontStyle: 'italic' }}>
+                            "{logEntry.notes}"
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
+                ) : (
+                  history.length > 0 && !isLogging && (
+                    <div style={{ fontSize: 10, color: '#8b8378', marginTop: 4 }}>
+                      {history.length} action{history.length > 1 ? 's' : ''} logged
+                      {history[0]?.notes && (
+                        <span style={{ color: '#5b554d' }}> · &quot;{history[0].notes}&quot;</span>
+                      )}
+                    </div>
+                  )
                 )}
               </div>
             </div>
@@ -521,6 +599,57 @@ export default function OutreachTracker() {
       <div style={{ borderTop: '3px double #1a1814', marginTop: 40, paddingTop: 20, textAlign: 'center', fontSize: 11, color: '#8b8378' }}>
         Outreach Ledger · powered by Supabase · {contacts.length} contacts loaded
       </div>
+
+      {/* Add Contact Modal */}
+      {isAddModalOpen && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20
+        }}>
+          <div style={{
+            background: '#faf7f2', padding: 24, border: '2px solid #1a1814', width: '100%', maxWidth: 500, maxHeight: '90vh', overflowY: 'auto', position: 'relative'
+          }}>
+            <button onClick={() => setIsAddModalOpen(false)} style={{
+              position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#1a1814'
+            }}>×</button>
+            <h2 style={{ fontFamily: 'Georgia,serif', margin: '0 0 16px 0', fontSize: 24 }}>Add New Contact</h2>
+            <form onSubmit={handleAddContact} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <input required placeholder="Name *" value={newContact.name} onChange={e => setNewContact({...newContact, name: e.target.value})} style={inputStyle} />
+              <input placeholder="Job Title" value={newContact.title} onChange={e => setNewContact({...newContact, title: e.target.value})} style={inputStyle} />
+              <input required placeholder="Company *" value={newContact.company} onChange={e => setNewContact({...newContact, company: e.target.value})} style={inputStyle} />
+              <input placeholder="LinkedIn URL" value={newContact.linkedin} onChange={e => setNewContact({...newContact, linkedin: e.target.value})} style={inputStyle} />
+              <input type="email" placeholder="Email" value={newContact.email} onChange={e => setNewContact({...newContact, email: e.target.value})} style={inputStyle} />
+              <div style={{ display: 'flex', gap: 10 }}>
+                <input placeholder="City" value={newContact.city} onChange={e => setNewContact({...newContact, city: e.target.value})} style={{...inputStyle, flex: 1}} />
+                <input placeholder="State" value={newContact.state} onChange={e => setNewContact({...newContact, state: e.target.value})} style={{...inputStyle, flex: 1}} />
+              </div>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <label style={{ fontSize: 12, fontFamily: 'monospace' }}>Fit for Resume:</label>
+                <select value={newContact.fit_for_resume} onChange={e => setNewContact({...newContact, fit_for_resume: e.target.value})} style={{...inputStyle, width: 'auto'}}>
+                  <option>High</option><option>Medium</option><option>Low</option>
+                </select>
+              </div>
+              <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'monospace' }}>
+                <input type="checkbox" checked={newContact.actively_hiring} onChange={e => setNewContact({...newContact, actively_hiring: e.target.checked})} />
+                Actively Hiring
+              </label>
+              <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'monospace' }}>
+                <input type="checkbox" checked={newContact.has_network_intro} onChange={e => setNewContact({...newContact, has_network_intro: e.target.checked})} />
+                Has Warm Intro
+              </label>
+              {newContact.has_network_intro && (
+                 <input placeholder="Intro via (Name)" value={newContact.network_intro_via} onChange={e => setNewContact({...newContact, network_intro_via: e.target.value})} style={inputStyle} />
+              )}
+              <textarea placeholder="Optional notes..." value={newContact.note} onChange={e => setNewContact({...newContact, note: e.target.value})} style={{...inputStyle, height: 60}} />
+              <button type="submit" disabled={isSubmittingContact} style={{
+                background: '#1a1814', color: '#fff', padding: 12, border: 'none', fontFamily: 'monospace', cursor: isSubmittingContact ? 'wait' : 'pointer', marginTop: 8, textTransform: 'uppercase', letterSpacing: '0.08em'
+              }}>
+                {isSubmittingContact ? 'Saving...' : 'Save Contact'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
