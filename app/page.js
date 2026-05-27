@@ -106,8 +106,8 @@ export default function OutreachTracker() {
 
   useEffect(() => { load(); }, []);
 
-  async function load() {
-    setLoading(true);
+  async function load(showLoader = true) {
+    if (showLoader) setLoading(true);
     try {
       const { data: c, error: cErr } = await supabase
         .from('contacts_with_status')
@@ -149,7 +149,7 @@ export default function OutreachTracker() {
     } else {
       setLogging(null);
       setNote('');
-      load();
+      load(false);
     }
     setSaving(false);
   }
@@ -163,7 +163,7 @@ export default function OutreachTracker() {
       console.error("Error deleting contact:", error);
       alert("Error deleting contact: " + error.message);
     } else {
-      load();
+      load(false);
     }
   }
 
@@ -250,7 +250,7 @@ export default function OutreachTracker() {
             ['intro', '⭐ Network'],
             ['hiring', '🔥 Hiring'],
             ['contacted', 'Contacted'],
-            ['pending', 'Pending'],
+            ['pending', 'No Outreach Yet'],
           ].map(([f, label]) => (
             <button key={f} onClick={() => setFilter(f)} style={{
               fontFamily: 'monospace', fontSize: 11, padding: '8px 14px',
