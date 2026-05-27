@@ -26,6 +26,8 @@ export default function OutreachTracker() {
   const [logs, setLogs] = useState({});
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('');
+  const [companyFilter, setCompanyFilter] = useState('');
   const [search, setSearch] = useState('');
   const [logging, setLogging] = useState(null);
   const [action, setAction] = useState('email_sent');
@@ -157,12 +159,27 @@ export default function OutreachTracker() {
       c.name.toLowerCase().includes(search.toLowerCase()) ||
       c.company.toLowerCase().includes(search.toLowerCase());
     if (!matchSearch) return false;
+
+    if (dateFilter) {
+      if (!c.created_at) return false;
+      const contactDate = new Date(c.created_at).toISOString().split('T')[0];
+      if (contactDate !== dateFilter) return false;
+    }
+
+    if (companyFilter) {
+      if (c.company !== companyFilter) return false;
+    }
+
     if (filter === 'intro') return c.has_network_intro;
     if (filter === 'hiring') return c.actively_hiring;
     if (filter === 'contacted') return c.latest_action;
     if (filter === 'pending') return !c.latest_action;
     return true;
   });
+
+  const uniqueCompanies = Array.from(new Set(contacts.map(c => c.company))).filter(Boolean).sort(
+    (a, b) => a.toLowerCase().localeCompare(b.toLowerCase())
+  );
 
   const stats = {
     total: contacts.length,
@@ -207,53 +224,98 @@ export default function OutreachTracker() {
       </div>
 
       {/* Search + filters */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Search name or company..."
-          style={{ fontFamily: 'monospace', fontSize: 12, padding: '8px 12px', border: '1px solid #1a1814', background: '#fff', flex: 1, minWidth: 180 }}
-        />
-        {[
-          ['all', `All (${stats.total})`],
-          ['intro', '⭐ Network'],
-          ['hiring', '🔥 Hiring'],
-          ['contacted', 'Contacted'],
-          ['pending', 'Pending'],
-        ].map(([f, label]) => (
-          <button key={f} onClick={() => setFilter(f)} style={{
-            fontFamily: 'monospace', fontSize: 11, padding: '8px 14px',
-            border: '1px solid #1a1814',
-            background: filter === f ? '#1a1814' : '#fff',
-            color: filter === f ? '#fff' : '#1a1814',
-            cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.08em'
-          }}>
-            {label}
-          </button>
-        ))}
-        
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
-          <input 
-            type="file" 
-            accept=".csv" 
-            style={{ display: 'none' }} 
-            ref={fileInputRef}
-            onChange={handleImport} 
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search name or company..."
+            style={{ fontFamily: 'monospace', fontSize: 12, padding: '8px 12px', border: '1px solid #1a1814', background: '#fff', flex: 1, minWidth: 180 }}
           />
-          <button 
-            onClick={() => fileInputRef.current?.click()} 
-            disabled={uploading}
-            style={{
+          {[
+            ['all', `All (${stats.total})`],
+            ['intro', '⭐ Network'],
+            ['hiring', '🔥 Hiring'],
+            ['contacted', 'Contacted'],
+            ['pending', 'Pending'],
+          ].map(([f, label]) => (
+            <button key={f} onClick={() => setFilter(f)} style={{
               fontFamily: 'monospace', fontSize: 11, padding: '8px 14px',
               border: '1px solid #1a1814',
-              background: '#1a1814',
-              color: '#fff',
-              cursor: uploading ? 'wait' : 'pointer', 
-              textTransform: 'uppercase', 
-              letterSpacing: '0.08em'
+              background: filter === f ? '#1a1814' : '#fff',
+              color: filter === f ? '#fff' : '#1a1814',
+              cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.08em'
             }}>
-            {uploading ? 'Importing...' : 'Import CSV'}
-          </button>
+              {label}
+            </button>
+          ))}
+          
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
+            <input 
+              type="file" 
+              accept=".csv" 
+              style={{ display: 'none' }} 
+              ref={fileInputRef}
+              onChange={handleImport} 
+            />
+            <button 
+              onClick={() => fileInputRef.current?.click()} 
+              disabled={uploading}
+              style={{
+                fontFamily: 'monospace', fontSize: 11, padding: '8px 14px',
+                border: '1px solid #1a1814',
+                background: '#1a1814',
+                color: '#fff',
+                cursor: uploading ? 'wait' : 'pointer', 
+                textTransform: 'uppercase', 
+                letterSpacing: '0.08em'
+              }}>
+              {uploading ? 'Importing...' : 'Import CSV'}
+            </button>
+          </div>
+        </div>
+
+        {/* Extra Filters Row */}
+        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'center' }}>
+          {/* Date Added Filter */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ fontSize: 11, color: '#8b8378', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Added:</label>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <input
+                type="date"
+                value={dateFilter}
+                onChange={e => setDateFilter(e.target.value)}
+                style={{ fontFamily: 'monospace', fontSize: 11, padding: '6px 10px', border: '1px solid #1a1814', background: '#fff' }}
+              />
+              {dateFilter && (
+                <button onClick={() => setDateFilter('')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, marginLeft: 4, color: '#c63d1f' }} title="Clear Date">
+                  ✖
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Company Filter */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ fontSize: 11, color: '#8b8378', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Company:</label>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <select
+                value={companyFilter}
+                onChange={e => setCompanyFilter(e.target.value)}
+                style={{ fontFamily: 'monospace', fontSize: 11, padding: '6px 10px', border: '1px solid #1a1814', background: '#fff', minWidth: 140 }}
+              >
+                <option value="">All Companies</option>
+                {uniqueCompanies.map(comp => (
+                  <option key={comp} value={comp}>{comp}</option>
+                ))}
+              </select>
+              {companyFilter && (
+                <button onClick={() => setCompanyFilter('')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, marginLeft: 4, color: '#c63d1f' }} title="Clear Company">
+                  ✖
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
