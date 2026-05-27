@@ -154,6 +154,19 @@ export default function OutreachTracker() {
     setSaving(false);
   }
 
+  async function deleteContact(id) {
+    if (!window.confirm("Are you sure you want to delete this profile?")) return;
+    
+    // Optimistic UI update could be added here, but we'll stick to loading
+    const { error } = await supabase.from('contacts').delete().eq('id', id);
+    if (error) {
+      console.error("Error deleting contact:", error);
+      alert("Error deleting contact: " + error.message);
+    } else {
+      load();
+    }
+  }
+
   const filtered = contacts.filter(c => {
     const matchSearch = !search ||
       c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -410,6 +423,20 @@ export default function OutreachTracker() {
                       </svg>
                     </a>
                   )}
+                  <button 
+                    onClick={() => deleteContact(c.id)} 
+                    style={{
+                      fontSize: 11, padding: '7px 10px',
+                      border: '1px solid #c63d1f', background: '#fff', color: '#c63d1f',
+                      cursor: 'pointer', flexShrink: 0,
+                      display: 'flex', alignItems: 'center', gap: 4
+                    }}
+                    title="Delete Profile"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M3 6v18h18v-18h-18zm5 14c0 .552-.448 1-1 1s-1-.448-1-1v-10c0-.552.448-1 1-1s1 .448 1 1v10zm5 0c0 .552-.448 1-1 1s-1-.448-1-1v-10c0-.552.448-1 1-1s1 .448 1 1v10zm5 0c0 .552-.448 1-1 1s-1-.448-1-1v-10c0-.552.448-1 1-1s1 .448 1 1v10zm4-18v2h-20v-2h5.711c.9 0 1.631-1.099 1.631-2h5.315c0 .901.73 2 1.631 2h5.712z"/>
+                    </svg>
+                  </button>
                 </div>
 
                 {/* Status row */}
